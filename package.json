@@ -1,0 +1,33 @@
+{
+  "name": "github-projectspace-tracker",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc-watch --onSuccess \"node ./dist/index.js\"",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zyplos/github-projectspace-tracker.git"
+  },
+  "author": "Angel (https://zyplos.dev)",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/Zyplos/github-projectspace-tracker/issues"
+  },
+  "homepage": "https://github.com/Zyplos/github-projectspace-tracker#readme",
+  "devDependencies": {
+    "@types/node": "^18.14.0",
+    "prettier": "^2.8.4",
+    "tsc-watch": "^6.0.0",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "octokit": "^2.0.14",
+    "tslib": "^2.5.0"
+  }
+}
