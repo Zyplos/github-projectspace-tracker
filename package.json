@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "getids": "node dist/getIds.js",
+    "cleanstart": "tsc && node dist/index.js",
     "dev": "tsc-watch --onSuccess \"node ./dist/index.js\"",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -14,7 +16,7 @@
     "url": "git+https://github.com/Zyplos/github-projectspace-tracker.git"
   },
   "author": "Angel (https://zyplos.dev)",
-  "private": true,
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/Zyplos/github-projectspace-tracker/issues"
   },
