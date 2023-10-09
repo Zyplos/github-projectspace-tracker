@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/Zyplos/github-projectspace-tracker#readme",
   "devDependencies": {
+    "@octokit/graphql-schema": "^14.34.0",
     "@types/node": "^18.14.0",
     "prettier": "^2.8.4",
     "tsc-watch": "^6.0.0",
