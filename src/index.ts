@@ -27,9 +27,17 @@ if (
 
 import { Octokit } from "octokit";
 import type { GraphQlQueryResponseData } from "@octokit/graphql";
+import type {
+  AddProjectV2DraftIssuePayload,
+  Maybe,
+  PageInfo,
+  ProjectV2Item,
+  ProjectV2ItemConnection,
+  UpdateProjectV2ItemFieldValuePayload,
+} from "@octokit/graphql-schema";
 const octokit = new Octokit({ auth: process.env.GITHUB_PERSONAL_TOKEN });
 
-function logFull(data: GraphQlQueryResponseData) {
+function logFull(data: any) {
   console.log(util.inspect(data, { showHidden: false, depth: null, colors: true }));
 }
 
@@ -38,15 +46,28 @@ function logFull(data: GraphQlQueryResponseData) {
 // https://docs.github.com/en/graphql/reference/input-objects#projectv2itemorder
 
 // returns first 3 items in the project
-async function getItems() {
-  const stuff: GraphQlQueryResponseData = await octokit.graphql(
-    `query($projectId: ID!) {
-  node(id: $projectId) {
+// items(first: 3, orderBy: {field: POSITION, direction: DESC}) {
+async function getItemsRecursive(
+  pageCursor?: string | null
+): Promise<{ pageInfo: PageInfo; projectItems: Maybe<ProjectV2Item>[] }> {
+  const {
+    node: {
+      // items: { nodes: projectItems },
+      items: { pageInfo, nodes },
+    },
+  } = await octokit.graphql<{ node: { items: ProjectV2ItemConnection } }>(
+    `query($projectId: ID!, $pageCursor: String) {
+      node(id: $projectId) {
       ... on ProjectV2 {
-        items(first: 3, orderBy: {field: POSITION, direction: DESC}) {
+        items(first: 30, orderBy: {field: POSITION, direction: DESC}, after: $pageCursor) {
+          pageInfo {
+            hasNextPage
+            hasPreviousPage
+            endCursor
+          }
           nodes{
             id
-            fieldValues(first: 8) {
+            fieldValues(last: 8) {
               nodes{                
                 ... on ProjectV2ItemFieldTextValue {
                   text
@@ -105,15 +126,35 @@ async function getItems() {
   }`,
     {
       projectId: process.env.PROJECT_ID,
+      pageCursor,
     }
   );
 
-  return stuff;
+  let projectItems = nodes;
+
+  if (!projectItems) {
+    return { pageInfo, projectItems: [] };
+  }
+
+  return { projectItems, pageInfo };
+}
+
+async function getItems() {
+  let allItems: Maybe<ProjectV2Item>[] = [];
+  let pageInfo: PageInfo = { hasNextPage: true, hasPreviousPage: false, endCursor: "" };
+
+  while (pageInfo.hasNextPage) {
+    const { projectItems, pageInfo: newPageInfo } = await getItemsRecursive(pageInfo.endCursor ?? null);
+    allItems = allItems.concat(projectItems);
+    pageInfo = newPageInfo;
+  }
+
+  return allItems;
 }
 
 // return details for a single item
 async function getSingleItem(itemId: string) {
-  const stuff: GraphQlQueryResponseData = await octokit.graphql(
+  const { node: result } = await octokit.graphql<{ node: ProjectV2Item }>(
     `query($itemId: ID!) {
   node(id: $itemId) {
       ... on ProjectV2Item {
@@ -176,12 +217,16 @@ async function getSingleItem(itemId: string) {
     }
   );
 
-  return stuff;
+  return result;
 }
 
 // makes a new draft item
 async function makeDraftItem(title: string, body: string) {
-  const stuff: GraphQlQueryResponseData = await octokit.graphql(
+  const {
+    addProjectV2DraftIssue: { projectItem },
+  } = await octokit.graphql<{
+    addProjectV2DraftIssue: AddProjectV2DraftIssuePayload;
+  }>(
     `mutation($projectId: ID!, $title: String!, $body: String!) {
       addProjectV2DraftIssue(input: {projectId: $projectId, title: $title, body: $body}) {
         projectItem {
@@ -196,12 +241,20 @@ async function makeDraftItem(title: string, body: string) {
     }
   );
 
-  return stuff;
+  if (!projectItem) {
+    throw new Error("projectItem is undefined for new draft item");
+  }
+
+  return projectItem.id;
 }
 
 // moves an item to the "ideaspace" column
-async function setItemFieldToIdeaspace(id: string) {
-  const stuff: GraphQlQueryResponseData = await octokit.graphql(
+async function setItemField(id: string, optionId: string = process.env.STATUS_OPTION_ID) {
+  const {
+    updateProjectV2ItemFieldValue: { projectV2Item },
+  } = await octokit.graphql<{
+    updateProjectV2ItemFieldValue: UpdateProjectV2ItemFieldValuePayload;
+  }>(
     `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
       updateProjectV2ItemFieldValue(
         input: {
@@ -222,30 +275,35 @@ async function setItemFieldToIdeaspace(id: string) {
       projectId: process.env.PROJECT_ID,
       itemId: id,
       fieldId: process.env.STATUS_FIELD_ID,
-      optionId: process.env.STATUS_OPTION_ID,
+      optionId,
     }
   );
 
-  return stuff;
+  if (!projectV2Item) {
+    throw new Error("projectItem is undefined for new draft item");
+  }
+
+  return projectV2Item.id;
 }
 
 ///////////////////////////
-
 async function main() {
   try {
-    const newItemId = await makeDraftItem("new ideaspace item graphql", "works!");
+    const newItemId = await makeDraftItem("!!! short term task !!!!", "works!");
+    logFull(newItemId);
 
-    const returnedUpdateItem = await setItemFieldToIdeaspace(newItemId.addProjectV2DraftIssue.projectItem.id);
+    const returnedUpdateItem = await setItemField(newItemId, process.env.STATUS_OPTION_ID);
     logFull(returnedUpdateItem);
 
-    const grabbedItem = await getSingleItem(newItemId.addProjectV2DraftIssue.projectItem.id);
+    const grabbedItem = await getSingleItem(newItemId);
     logFull(grabbedItem);
 
     const items = await getItems();
+    console.log(`Found ${items.length} items`);
     logFull(items);
   } catch (error) {
     console.error("MAIN ERROR");
-    console.error(error);
+    logFull(error);
   }
 }
 
