@@ -26,7 +26,6 @@ if (
 }
 
 import { Octokit } from "octokit";
-import type { GraphQlQueryResponseData } from "@octokit/graphql";
 import type {
   AddProjectV2DraftIssuePayload,
   Maybe,
@@ -45,9 +44,8 @@ function logFull(data: any) {
 // https://docs.github.com/en/graphql/reference/objects#projectv2
 // https://docs.github.com/en/graphql/reference/input-objects#projectv2itemorder
 
-// returns first 3 items in the project
-// items(first: 3, orderBy: {field: POSITION, direction: DESC}) {
-async function getItemsRecursive(
+// get the first 30 items or the first 30 items starting a cursor
+async function getItemsPaginated(
   pageCursor?: string | null
 ): Promise<{ pageInfo: PageInfo; projectItems: Maybe<ProjectV2Item>[] }> {
   const {
@@ -139,12 +137,13 @@ async function getItemsRecursive(
   return { projectItems, pageInfo };
 }
 
-async function getItems() {
+// returns all items in the project
+async function getAllItems() {
   let allItems: Maybe<ProjectV2Item>[] = [];
   let pageInfo: PageInfo = { hasNextPage: true, hasPreviousPage: false, endCursor: "" };
 
   while (pageInfo.hasNextPage) {
-    const { projectItems, pageInfo: newPageInfo } = await getItemsRecursive(pageInfo.endCursor ?? null);
+    const { projectItems, pageInfo: newPageInfo } = await getItemsPaginated(pageInfo.endCursor ?? null);
     allItems = allItems.concat(projectItems);
     pageInfo = newPageInfo;
   }
@@ -248,7 +247,7 @@ async function makeDraftItem(title: string, body: string) {
   return projectItem.id;
 }
 
-// moves an item to the "ideaspace" column
+// moves an item to a section given an optionId
 async function setItemField(id: string, optionId: string = process.env.STATUS_OPTION_ID) {
   const {
     updateProjectV2ItemFieldValue: { projectV2Item },
@@ -298,7 +297,7 @@ async function main() {
     const grabbedItem = await getSingleItem(newItemId);
     logFull(grabbedItem);
 
-    const items = await getItems();
+    const items = await getAllItems();
     console.log(`Found ${items.length} items`);
     logFull(items);
   } catch (error) {
