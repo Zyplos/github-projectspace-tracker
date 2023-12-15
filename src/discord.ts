@@ -1,9 +1,12 @@
 import {
-  ActivityType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   Client,
   EmbedBuilder,
   GatewayIntentBits,
+  MessageEditOptions,
   Partials,
   PermissionFlagsBits,
 } from "discord.js";
@@ -61,11 +64,17 @@ export class ProjectspaceBot {
 
   async start() {
     this.registerEventListeners();
-    // await this.projectInstance.getAllItems();
+    if (!config.timelineOnly) {
+      // await this.projectInstance.getAllItems();
+    }
     await this.client.login(process.env.DISCORD_TOKEN);
 
     // if discordBoardChannelId and discordBoardMessageId are set correctly then update the board
-    if (!isStringBlank(config.discordBoardChannelId) && !isStringBlank(config.discordBoardMessageId)) {
+    if (
+      !isStringBlank(config.discordBoardChannelId) &&
+      config.discordBoardMessageId &&
+      !isStringBlank(config.discordBoardMessageId)
+    ) {
       this.updateBoard();
     } else {
       console.log("Board was not updated. Make sure discordBoardChannelId and discordBoardMessageId are set.");
@@ -96,10 +105,29 @@ export class ProjectspaceBot {
       console.error(`Channel with id ${config.discordBoardChannelId} is not a text channel.`);
       process.exit(-1);
     }
+    if (!config.discordBoardMessageId || isStringBlank(config.discordBoardMessageId)) {
+      console.error("Tried to update the board but discordBoardMessageId is not set in config.");
+      process.exit(-1);
+    }
 
     const message = await channel.messages.fetch(config.discordBoardMessageId);
-    const pingEmbed = this.generateBoardEmbed();
-    await message.edit({ content: "\t", embeds: [pingEmbed] });
+    const embeds = this.generateBoardEmbed();
+
+    // create link button
+    const button = new ButtonBuilder()
+      .setLabel("View on GitHub")
+      .setURL(config.projectBoardLink)
+      .setStyle(ButtonStyle.Link);
+
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(button);
+
+    let payload: MessageEditOptions = { content: "\t", embeds, components: [] };
+
+    if (!config.timelineOnly) {
+      payload.components = [row];
+    }
+
+    await message.edit(payload);
 
     if (reschedule) this.rescheduleUpdate();
   }
@@ -143,18 +171,46 @@ export class ProjectspaceBot {
 
     monthArray[calcData.currentMonth] = inProgressIcons[calcData.thirdOfMonth];
 
-    const pingEmbed = new EmbedBuilder()
-      .setDescription(
-        `${monthArray.join(
-          ""
-        )}\n\n\n[2] Short Term Tasks\nfinish team outreach stuff <@204620732259368960>\ngeneric todo item <@204620732259368960>\n\n[4] Not Started\nanother todo item <@204620732259368960>\neven more todo stuff really important <@204620732259368960>\ndont forget this one <@204620732259368960>\nand one more <@204620732259368960>`
-      )
-      .setColor(0x2b2d31)
+    const boardColor = 0x2b2d31;
+
+    const timelineEmbed = new EmbedBuilder()
+      .setDescription(monthArray.join(""))
+      .setColor(boardColor)
       .setFooter({
         text: `🗓️ This semester is ${calcData.yearPercentDone}% complete`,
       });
 
-    return pingEmbed;
+    if (config.discordBoardTitle) {
+      timelineEmbed.setTitle(config.discordBoardTitle);
+    }
+
+    if (config.timelineOnly) {
+      return [timelineEmbed];
+    }
+
+    const boardEmbed = new EmbedBuilder()
+      .setTitle("🗃️ Project Board")
+      .setDescription("Pending items from:\n<@204620732259368960>")
+      .addFields({
+        name: "[2] Short Term Tasks",
+        value: "finish team outreach stuff <@204620732259368960>\ngeneric todo item <@204620732259368960>",
+      })
+      .addFields({
+        name: "[4] Not Started",
+        value:
+          "another todo item <@204620732259368960>\neven more todo stuff really important <@204620732259368960>\ndont forget this one <@204620732259368960>\nand one more <@204620732259368960>",
+      })
+      .addFields({
+        name: "At a Glance",
+        value: "**[1]** Backlog\n**[4]** In Progress\n**[23]** ideaspace",
+      })
+      .setColor(boardColor)
+      .setFooter({
+        text: `📋 20 pending items as of`,
+      })
+      .setTimestamp();
+
+    return [timelineEmbed, boardEmbed];
   }
 
   calculateData() {
