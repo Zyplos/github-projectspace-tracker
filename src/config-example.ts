@@ -31,6 +31,8 @@ type Config = {
   discordBoardTitle?: string;
 
   timelineOnly?: boolean;
+  timelineStartDate: Date;
+  timelineEndDate: Date;
 
   discordBoardChannelId: string;
   discordBoardMessageId?: string;
@@ -68,6 +70,8 @@ export default {
   discordBoardTitle: "☀️ Spring 2024",
 
   timelineOnly: true,
+  timelineStartDate: new Date(2023, 11, 1),
+  timelineEndDate: new Date(2023, 11, 16),
 
   discordBoardChannelId: "520697468300689409",
   discordBoardMessageId: "1184624444119986297",
