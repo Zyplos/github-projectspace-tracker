@@ -13,7 +13,7 @@ import {
 import config from "./config";
 import { ProjectInstance } from "./github";
 import { isStringBlank, logFull } from "./common";
-import { getPercentageOfMonthDone, getPercentageOfYearElapsed, getThird } from "./dateStuff";
+import { getCurrentSegmentIndex, getPercentageOfTimelineElapsed, getCurrentSegmentPartIndex } from "./dateStuff";
 
 export class ProjectspaceBot {
   client: Client;
@@ -53,10 +53,7 @@ export class ProjectspaceBot {
       // actual stuff
       const content = message.content.trim();
 
-      if (content === "gb;forceupdate") {
-        // TODO
-        console.log("UNIMPLEMENTED");
-      } else if (content === "gb;init") {
+      if (content === "gb;init") {
         message.channel.send("⚙");
       }
     });
@@ -146,38 +143,62 @@ export class ProjectspaceBot {
     // Calculate the number of milliseconds until midnight
     const millisecondsUntilMidnight = midnight.getTime() - now.getTime();
 
-    console.log(millisecondsUntilMidnight / 1000 / 60 / 60);
+    console.log("SCHEDULING IN ", millisecondsUntilMidnight / 1000 / 60);
 
     // Set the timeout to execute the callback at midnight
-    setTimeout(this.updateBoard, millisecondsUntilMidnight);
+    // using.bind() fixes the this scope for updateBoard https://stackoverflow.com/a/5911280
+    setTimeout(this.updateBoard.bind(this), millisecondsUntilMidnight);
   }
 
   generateBoardEmbed() {
-    const calcData = this.calculateData();
+    const calcData = this.getTimelineData();
     console.log(calcData);
 
-    const inProgressIcons = {
-      1: "<a:monthInProgress1:1055628645076582532>",
-      2: "<a:monthInProgress2:1055628646313885706>",
-      3: "<a:monthInProgress3:1055628647333122081>",
-    };
+    const {
+      INPROGRESS,
+      STARTPOINT_TOP,
+      STARTPOINT_BOTTOM,
+      MIDPOINT_TOP,
+      MIDPOINT_BOTTOM,
+      ENDPOINT_TOP,
+      ENDPOINT_BOTTOM,
+      BLANK,
+      UPCOMING,
+      COMPLETE,
+    } = config.discordIcons;
 
-    const monthArray = Array(12).fill("<:month:1055621854313848964>");
-    if (calcData.elapsedMonths !== 0) {
-      for (let i = 0; i <= calcData.elapsedMonths; i++) {
-        monthArray[i] = "<:monthComplete:1055621855844769842>";
+    let monthArray = [];
+
+    if (calcData.timelinePercentDone < 100) {
+      monthArray = Array(10).fill(UPCOMING);
+      for (let i = 0; i < calcData.currentSegmentIndex; i++) {
+        monthArray[i] = COMPLETE;
       }
-    }
 
-    monthArray[calcData.currentMonth] = inProgressIcons[calcData.thirdOfMonth];
+      monthArray[calcData.currentSegmentIndex] = INPROGRESS[calcData.currentSegmentPartIndex];
+    } else {
+      monthArray = Array(10).fill(COMPLETE);
+    }
 
     const boardColor = 0x2b2d31;
 
+    const topTickers =
+      STARTPOINT_TOP + Array(3).fill(BLANK).join("") + MIDPOINT_TOP + Array(4).fill(BLANK).join("") + ENDPOINT_TOP;
+    const middleIcons = monthArray.join("");
+    const bottomTickers =
+      STARTPOINT_BOTTOM +
+      Array(3).fill(BLANK).join("") +
+      MIDPOINT_BOTTOM +
+      Array(4).fill(BLANK).join("") +
+      ENDPOINT_BOTTOM;
+
+    const OUTPUT = [topTickers, middleIcons, bottomTickers].join("\n");
+
     const timelineEmbed = new EmbedBuilder()
-      .setDescription(monthArray.join(""))
+      .setDescription(OUTPUT)
       .setColor(boardColor)
       .setFooter({
-        text: `🗓️ This semester is ${calcData.yearPercentDone}% complete`,
+        text: `🗓️ This semester is ${calcData.timelinePercentDone}% complete`,
       });
 
     if (config.discordBoardTitle) {
@@ -213,23 +234,15 @@ export class ProjectspaceBot {
     return [timelineEmbed, boardEmbed];
   }
 
-  calculateData() {
-    const currentDate = new Date();
-    const currentMonth = currentDate.getMonth();
-    const currentYear = currentDate.getFullYear();
-
-    const elapsedMonths = currentDate.getMonth();
-    const yearPercentDone = Math.round((getPercentageOfYearElapsed() + Number.EPSILON) * 10) / 10;
-
-    const monthPercentDone = getPercentageOfMonthDone();
-    const thirdOfMonth = getThird(monthPercentDone);
+  getTimelineData() {
+    const timelinePercentDone = getPercentageOfTimelineElapsed();
+    const currentSegmentIndex = getCurrentSegmentIndex(timelinePercentDone);
+    const currentSegmentPartIndex = getCurrentSegmentPartIndex(timelinePercentDone);
 
     return {
-      elapsedMonths,
-      yearPercentDone,
-      thirdOfMonth,
-      currentMonth,
-      currentYear,
+      timelinePercentDone,
+      currentSegmentIndex,
+      currentSegmentPartIndex,
     };
   }
 }
