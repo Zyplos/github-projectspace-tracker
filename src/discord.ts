@@ -6,12 +6,13 @@ import {
   Client,
   EmbedBuilder,
   GatewayIntentBits,
+  Message,
   MessageEditOptions,
   Partials,
   PermissionFlagsBits,
 } from "discord.js";
-import config from "./config";
-import { ProjectInstance } from "./github";
+import config, { labelTitles } from "./config";
+import { ProjectInstance, makeDraftItem, setItemField } from "./github";
 import { isStringBlank, logFull } from "./common";
 import { getCurrentSegmentIndex, getPercentageOfTimelineElapsed, getCurrentSegmentPartIndex } from "./dateStuff";
 
@@ -57,12 +58,16 @@ export class ProjectspaceBot {
         message.channel.send("⚙");
       }
     });
+
+    // on client get message
+    this.client.on("messageCreate", this.createTodoFromMessage.bind(this));
   }
 
   async start() {
     this.registerEventListeners();
     if (!config.timelineOnly) {
-      // await this.projectInstance.getAllItems();
+      await this.projectInstance.getAllItems();
+      // logFull(this.projectInstance.allItems);
     }
     await this.client.login(process.env.DISCORD_TOKEN);
 
@@ -72,7 +77,11 @@ export class ProjectspaceBot {
       config.discordBoardMessageId &&
       !isStringBlank(config.discordBoardMessageId)
     ) {
-      this.updateBoard();
+      try {
+        await this.updateBoard();
+      } catch (error) {
+        logFull(error);
+      }
     } else {
       console.log("Board was not updated. Make sure discordBoardChannelId and discordBoardMessageId are set.");
     }
@@ -80,9 +89,37 @@ export class ProjectspaceBot {
     // if not, the bot should still launch so people can create the init message to put in the config
   }
 
-  devspace() {
-    const detailedItems = this.projectInstance.getItemsByLabel(config.detailedStatusId);
-    logFull(detailedItems);
+  async createTodoFromMessage(message: Message) {
+    const { optionPrefixes, githubUsernamesToDiscordIds } = config;
+    const prefixes = Object.keys(optionPrefixes);
+    const allowedUsers = Object.values(githubUsernamesToDiscordIds);
+
+    if (!allowedUsers.includes(message.author.id)) return;
+
+    const prefix = prefixes.find((prefix) => message.content.startsWith(prefix));
+    if (!prefix) return;
+
+    const todoItemTitle = message.content.slice(prefix.length).trim();
+
+    const optionId = optionPrefixes[prefix];
+    message.channel.send(`GOT ${prefix} FOR ${labelTitles[optionId] || "default"} | TITLE ${todoItemTitle}`);
+
+    try {
+      const newItemId = await makeDraftItem(todoItemTitle, "Created from Discord");
+
+      if (optionId.toLowerCase() === "default") {
+        message.react("✅");
+      } else {
+        await setItemField(newItemId, optionId);
+
+        message.react("✅");
+      }
+    } catch (e) {
+      console.error(e);
+      message.reply(
+        `Unable to completely add new item to ${labelTitles[optionId] || "default"}.\n${(e as Error).toString()}}`
+      );
+    }
   }
 
   async getBoardChannel() {
@@ -151,8 +188,8 @@ export class ProjectspaceBot {
   }
 
   generateBoardEmbed() {
-    const calcData = this.getTimelineData();
-    console.log(calcData);
+    const timelineData = this.getTimelineData();
+    console.log(timelineData);
 
     const {
       INPROGRESS,
@@ -169,13 +206,13 @@ export class ProjectspaceBot {
 
     let monthArray = [];
 
-    if (calcData.timelinePercentDone < 100) {
+    if (timelineData.timelinePercentDone < 100) {
       monthArray = Array(10).fill(UPCOMING);
-      for (let i = 0; i < calcData.currentSegmentIndex; i++) {
+      for (let i = 0; i < timelineData.currentSegmentIndex; i++) {
         monthArray[i] = COMPLETE;
       }
 
-      monthArray[calcData.currentSegmentIndex] = INPROGRESS[calcData.currentSegmentPartIndex];
+      monthArray[timelineData.currentSegmentIndex] = INPROGRESS[timelineData.currentSegmentPartIndex];
     } else {
       monthArray = Array(10).fill(COMPLETE);
     }
@@ -198,7 +235,7 @@ export class ProjectspaceBot {
       .setDescription(OUTPUT)
       .setColor(boardColor)
       .setFooter({
-        text: `🗓️ This semester is ${calcData.timelinePercentDone}% complete`,
+        text: `🗓️ This semester is ${timelineData.timelinePercentDone}% complete`,
       });
 
     if (config.discordBoardTitle) {
@@ -209,25 +246,22 @@ export class ProjectspaceBot {
       return [timelineEmbed];
     }
 
+    const boardItems = this.getGitHubData();
+    logFull(boardItems);
     const boardEmbed = new EmbedBuilder()
       .setTitle("🗃️ Project Board")
-      .setDescription("Pending items from:\n<@204620732259368960>")
+      .setDescription("\t")
       .addFields({
-        name: "[2] Short Term Tasks",
-        value: "finish team outreach stuff <@204620732259368960>\ngeneric todo item <@204620732259368960>",
-      })
-      .addFields({
-        name: "[4] Not Started",
-        value:
-          "another todo item <@204620732259368960>\neven more todo stuff really important <@204620732259368960>\ndont forget this one <@204620732259368960>\nand one more <@204620732259368960>",
+        name: `[${boardItems.detailed.amount}] ${boardItems.detailed.label}`,
+        value: boardItems.detailed.output,
       })
       .addFields({
         name: "At a Glance",
-        value: "**[1]** Backlog\n**[4]** In Progress\n**[23]** ideaspace",
+        value: boardItems.summaried.output,
       })
       .setColor(boardColor)
       .setFooter({
-        text: `📋 20 pending items as of`,
+        text: `📋 ${boardItems.totalAmount} pending items, last checked`,
       })
       .setTimestamp();
 
@@ -243,6 +277,125 @@ export class ProjectspaceBot {
       timelinePercentDone,
       currentSegmentIndex,
       currentSegmentPartIndex,
+    };
+  }
+
+  getGitHubData() {
+    const { detailedStatusId, summariedSectionIds } = config;
+    let totalTrackedItemAmount = 0;
+
+    const detailedGitHubItems = this.projectInstance.getItemsByLabel(detailedStatusId);
+    const detailedGitHubItemsAmount = detailedGitHubItems.length;
+    totalTrackedItemAmount += detailedGitHubItemsAmount;
+    let detailedDiscordItems = "";
+
+    const STRING_LIMIT = 3980;
+
+    let MAX_FLAG = false;
+    for (let i = 0; i < detailedGitHubItems.length; i++) {
+      const item = detailedGitHubItems[i];
+      if (!item.content) continue;
+      const { title, assignees } = item.content;
+
+      detailedDiscordItems += `${title}`;
+
+      if (!assignees.nodes || assignees.nodes.length === 0) {
+        detailedDiscordItems += "\n";
+        continue;
+      }
+      detailedDiscordItems += " • ";
+      for (let j = 0; j < assignees.nodes.length; j++) {
+        const node = assignees.nodes[j];
+        if (!node) continue;
+
+        const githubUsername = node.login;
+        const discordId = config.githubUsernamesToDiscordIds[githubUsername.toLocaleLowerCase()];
+
+        const userMentionString = discordId ? `<@${discordId}>` : githubUsername;
+        if ((detailedDiscordItems + `${userMentionString} `).length > STRING_LIMIT) {
+          MAX_FLAG = true;
+          break;
+        } else {
+          detailedDiscordItems += `${userMentionString} `;
+        }
+      }
+
+      if (MAX_FLAG) {
+        detailedDiscordItems += "\n\nView the rest on GitHub.";
+        break;
+      }
+
+      detailedDiscordItems += "\n";
+    }
+
+    if (detailedGitHubItemsAmount === 0) {
+      detailedDiscordItems = "No todos!";
+    }
+
+    const summariedGitHubItems = summariedSectionIds.map((id) => this.projectInstance.getItemsByLabel(id));
+
+    // get assignees from all items without duplicates
+    const assigneesArray: Set<string>[] = [];
+    summariedGitHubItems.forEach((section) => {
+      const assigneesSet = new Set<string>();
+      section.forEach((item) => {
+        if (!item.content) return;
+        const { assignees } = item.content;
+
+        if (!assignees.nodes) return;
+        assignees.nodes.forEach((node) => {
+          if (!node) return;
+
+          const githubUsername = node.login;
+
+          assigneesSet.add(githubUsername);
+        });
+      });
+      assigneesArray.push(assigneesSet);
+    });
+
+    // get length of each array in summariedGitHubItems
+    const summariedGitHubItemsLengths = summariedGitHubItems.map((section) => section.length);
+
+    // put it all together
+    let summariedDiscordItems = "";
+    summariedSectionIds.forEach((sectionId, index) => {
+      const sectionLabel = labelTitles[sectionId];
+      const sectionAmount = summariedGitHubItemsLengths[index];
+      totalTrackedItemAmount += sectionAmount;
+
+      const sectionAssigneesRaw = assigneesArray[index];
+      const sectionAssignees = Array.from(sectionAssigneesRaw);
+
+      // use discordid if it exists, otherwise use github username
+      const sectionAssigneesDiscordRaw = sectionAssignees.map((username) => {
+        const discordId = config.githubUsernamesToDiscordIds[username.toLocaleLowerCase()];
+        if (discordId) {
+          return `<@${discordId}>`;
+        } else {
+          return username;
+        }
+      });
+
+      const sectionAssigneesFormatted = sectionAssigneesDiscordRaw.join(" ");
+
+      summariedDiscordItems += `**[${sectionAmount}]** ${sectionLabel}`;
+      if (!isStringBlank(sectionAssigneesFormatted)) {
+        summariedDiscordItems += ` • ${sectionAssigneesFormatted}`;
+      }
+      summariedDiscordItems += "\n";
+    });
+
+    return {
+      detailed: {
+        label: labelTitles[detailedStatusId],
+        output: detailedDiscordItems,
+        amount: detailedGitHubItemsAmount,
+      },
+      summaried: {
+        output: summariedDiscordItems,
+      },
+      totalAmount: totalTrackedItemAmount,
     };
   }
 }

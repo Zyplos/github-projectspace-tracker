@@ -184,8 +184,8 @@ async function getSingleItem(itemId: string) {
   return result;
 }
 
-// makes a new draft item
-async function makeDraftItem(title: string, body: string) {
+// makes a new draft item, returns id of a new item
+export async function makeDraftItem(title: string, body: string) {
   const {
     addProjectV2DraftIssue: { projectItem },
   } = await octokit.graphql<{
@@ -214,7 +214,8 @@ async function makeDraftItem(title: string, body: string) {
 
 // moves an item to a section given an optionId
 // by default it will add items to the ideaspace section
-async function setItemField(id: string, optionId: string = config.defaultAddToStatusId) {
+// returns the id of the edited item
+export async function setItemField(id: string, optionId: string) {
   const {
     updateProjectV2ItemFieldValue: { projectV2Item },
   } = await octokit.graphql<{
