@@ -8,7 +8,7 @@ enum labels {
   done = "0628c7ad",
 }
 
-export const labelTitles = {
+export const labelTitles: { [key in labels]: string } = {
   [labels.boardMeetings]: "Board Meetings",
   [labels.shortTermTasks]: "Short Term Tasks",
   [labels.ideaspace]: "Ideaspace",
@@ -33,20 +33,21 @@ export default {
   },
   detailedStatusId: labels.shortTermTasks,
   summariedSectionIds: [labels.notStarted, labels.inProgress],
-  projectBoardLink: "https://github.com/orgs/zyplos/projects/5",
+  projectBoardLink: "https://github.com/orgs/acme/projects/5",
   discordBoardTitle: "☀️ Spring 2024",
 
   // setting this to true will make the bot only post the timeline embed
   timelineOnly: true,
   // setting this to true will disable the timeline embed and only show the board embed
-  disableTimeline: false,
+  // this one's commented out. do not mix with timelineOnly
+  // disableTimeline: true,
   // inclusive, starts at midnight
   timelineStartDate: new Date(2023, 11, 1),
   // exclusive, ends at midnight the previous day
   timelineEndDate: new Date(2023, 11, 31),
 
-  discordBoardChannelId: "520697468300689409",
-  discordBoardMessageId: "1184624444119986297",
+  discordBoardChannelId: "",
+  discordBoardMessageId: "",
 
   discordIcons: {
     INPROGRESS: {
