@@ -36,7 +36,10 @@ export default {
   projectBoardLink: "https://github.com/orgs/zyplos/projects/5",
   discordBoardTitle: "☀️ Spring 2024",
 
+  // setting this to true will make the bot only post the timeline embed
   timelineOnly: true,
+  // setting this to true will disable the timeline embed and only show the board embed
+  disableTimeline: false,
   // inclusive, starts at midnight
   timelineStartDate: new Date(2023, 11, 1),
   // exclusive, ends at midnight the previous day
@@ -77,6 +80,7 @@ type Config = {
   discordBoardTitle?: string;
 
   timelineOnly?: boolean;
+  disableTimeline?: boolean;
   timelineStartDate: Date;
   timelineEndDate: Date;
 

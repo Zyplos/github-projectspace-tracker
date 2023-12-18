@@ -265,6 +265,10 @@ export class ProjectspaceBot {
       })
       .setTimestamp();
 
+    if (config.disableTimeline) {
+      return [boardEmbed];
+    }
+
     return [timelineEmbed, boardEmbed];
   }
 
