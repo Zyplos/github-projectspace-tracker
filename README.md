@@ -2,7 +2,7 @@
 
 ![Screenshot](./screenshot.png)
 
-This project is meant for groups who actively communicate through Discord and use GitHub Projects as a way of tracking progress. Get a quick overview of what items are pending on your project board and who's working on what directly in Discord. The bot also includes the ability to make new todo items directly from Discord.
+This project is meant for groups who actively communicate through Discord and use GitHub Projects as a way of tracking progress. Get a quick overview of what items are pending on your project board and who's working on what directly in Discord. You can also create todo items right in chat for things you think of on the spot.
 
 The bot also includes a timeline feature with a configurable start and end date if your project has a deadline.
 

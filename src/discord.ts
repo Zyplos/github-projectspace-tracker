@@ -229,7 +229,7 @@ export class ProjectspaceBot {
       .setDescription(OUTPUT)
       .setColor(boardColor)
       .setFooter({
-        text: `🗓️ This semester is ${timelineData.timelinePercentDone}% complete`,
+        text: `🗓️ ${timelineData.timelinePercentDone}% complete`,
       });
 
     if (config.discordBoardTitle) {
