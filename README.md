@@ -48,13 +48,15 @@ Fill out the `labels` enum with the option IDs you got from `npm run getids`. Th
 
 Finally, if you're using the timeline feature, the bot expects to have some icons to build the timeline with. You can find some icons in the `icons` directory. You can also use your own icons, ideally use 18x18 icons as they'll scale perfectly down to what embeds size emotes to. Upload your icons to a Discord server your bot has access to and add the raw emote strings to the `config.ts` file.
 
-Get the Discord channel ID that will hold the message the bot will edit to keep information up to date and add it to the `config.ts`'s `discordBoardChannelId` property. If you're unsure of how to do this, take a look at [this article](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) from Discord Support.
+Get the Discord channel ID that will hold the message the bot will edit to keep information up to date and add it to the `config.ts`'s `discordBoardChannelId` property. Make sure your bot has permission to see and send messages in the configured channel.
+
+If you're unsure of how to do this, take a look at [this article](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) from Discord Support.
 
 ### Running the bot
 
 You can now run the bot by doing `npm run start` in your terminal. By default, the bot won't do anything as it still expects a message it can edit to keep information up to date.
 
-Send "gb;init" in the channel you configured in `config.ts` and the bot will send a message. Copy this message's ID and add it to the `config.ts`'s `discordBoardMessageId` property.
+Send "gb;init" in the channel you configured in `config.ts` and the bot will send a message. Copy this message's ID and add it to the `config.ts`'s `discordBoardMessageId` property. Make sure your bot has permission to send messages in the configured channel.
 
 Running the bot will by default only show the timeline. You can now start configuring the bot to show your Project board. Once you have it configured to your liking, you can do `npm run start` again to start the bot. The bot will refresh the message with up to date information every midnight.
 
@@ -62,11 +64,11 @@ Running the bot will by default only show the timeline. You can now start config
 
 #### `githubUsernamesToDiscordIds`
 
-If your GitHub collaborator also has a Discord, you can add their GitHub username and Discord ID to this object. This will allow the bot to mention them in the Project board embeds.
+If your GitHub collaborator also has a Discord, you can add their GitHub username and Discord ID to this object. This will allow the bot to mention them in the Project board embeds. The config expects GitHub usernames to be all lowercase.
 
 #### `optionPrefixes`
 
-This is a list of prefixes the bot will listen to in chat to create new todo items. For example, typing "st#new short term task" in chat will create a new todo item with the title "short term task" with the Short Term Tasks label that you configured in the `labels` enum.
+This is a list of prefixes the bot will listen to in chat to create new todo items. For example, typing "st#another short term task" in chat will create a new todo item with the title "another short term task" with the configured status ID from the `labels` enum.
 
 Setting it to `"default"` will add new todo items to whatever status you have configured in your Project's "Item added to project" workflow rule.
 
