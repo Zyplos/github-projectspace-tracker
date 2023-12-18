@@ -52,13 +52,15 @@ Get the Discord channel ID that will hold the message the bot will edit to keep 
 
 If you're unsure of how to do this, take a look at [this article](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) from Discord Support.
 
+**Everytime you make a config change, you will need to rebuild the project with `npm run build` before you start the bot again for your changes to take effect.**
+
 ### Running the bot
 
 You can now run the bot by doing `npm run start` in your terminal. By default, the bot won't do anything as it still expects a message it can edit to keep information up to date.
 
 Send "gb;init" in the channel you configured in `config.ts` and the bot will send a message. Copy this message's ID and add it to the `config.ts`'s `discordBoardMessageId` property. Make sure your bot has permission to send messages in the configured channel.
 
-Running the bot will by default only show the timeline. You can now start configuring the bot to show your Project board. Once you have it configured to your liking, you can do `npm run start` again to start the bot. The bot will refresh the message with up to date information every midnight.
+Running the bot will by default only show the timeline. You can now start configuring the bot to show your Project board. Once you have it configured to your liking, rebuild the project with `npm run build` and do `npm run start` again to start the bot. The bot will refresh the message with up to date information every midnight.
 
 ### Config Options
 
