@@ -139,6 +139,12 @@ export class ProjectspaceBot {
     }
 
     const message = await channel.messages.fetch(config.discordBoardMessageId);
+    // grab fresh data from github
+    if (!config.timelineOnly) {
+      await this.projectInstance.getAllItems();
+      // logFull(this.projectInstance.allItems);
+    }
+
     const embeds = this.generateBoardEmbed();
 
     // create link button
@@ -175,6 +181,7 @@ export class ProjectspaceBot {
     const millisecondsUntilMidnight = midnight.getTime() - now.getTime();
 
     console.log("SCHEDULING IN ", millisecondsUntilMidnight / 1000 / 60);
+    // console.log("SCHEDULING IN ", millisecondsUntilMidnight / 1000 / 60);
 
     // Set the timeout to execute the callback at midnight
     // using.bind() fixes the this scope for updateBoard https://stackoverflow.com/a/5911280
